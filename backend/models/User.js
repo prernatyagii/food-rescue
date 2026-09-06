@@ -3,7 +3,13 @@ const mongoose = require("mongoose");
 const userSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true },
-    email: { type: String, required: true, unique: true, lowercase: true, trim: true },
+    email: {
+      type: String,
+      required: true,
+      unique: true,
+      lowercase: true,
+      trim: true,
+    },
     password: { type: String, required: true },
     phone: { type: String, required: true },
     role: {
@@ -43,8 +49,10 @@ const userSchema = new mongoose.Schema(
     },
 
     isActive: { type: Boolean, default: true },
+    resetOtp: { type: String, default: null },
+    resetOtpExpiry: { type: Date, default: null },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 userSchema.index({ location: "2dsphere" });
