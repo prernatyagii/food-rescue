@@ -1,14 +1,6 @@
-// Mock multi-channel notification sender.
-//
-// The report describes "instant multi-channel notifications (app, push, SMS)".
-// For a demo/college project we don't want to require paid Twilio/Firebase
-// credentials just to run the app, so this logs the notification, saves it
-// to the DB (so it shows up in-app), and emits it over Socket.io in real time.
-//
-// To wire up real SMS/push later: drop your Twilio/Firebase code into the
-// marked spots below — the rest of the app doesn't need to change.
-
 const Notification = require("../models/Notification");
+const User = require("../models/User");
+const { sendEmail } = require("./email");
 
 let ioInstance = null;
 const setIO = (io) => {
@@ -16,7 +8,7 @@ const setIO = (io) => {
 };
 
 const notifyUser = async ({ userId, donationId, type, message }) => {
-  // 1. Persist so the user can see it in-app even if offline right now
+  // 1. In-app notification save
   const notification = await Notification.create({
     user: userId,
     donation: donationId,
@@ -24,14 +16,33 @@ const notifyUser = async ({ userId, donationId, type, message }) => {
     message,
   });
 
-  // 2. Real-time push via Socket.io ("app" + "push" channels)
+  // 2. Real-time Socket.io push
   if (ioInstance) {
     ioInstance.to(`user:${userId}`).emit("notification", notification);
   }
 
-  // 3. SMS fallback — mocked. Replace with real Twilio call:
-  //    await twilioClient.messages.create({ to: phone, from: TWILIO_NUMBER, body: message });
-  console.log(`[SMS-MOCK] -> user ${userId}: ${message}`);
+  // 3. Real-time Email & OTP delivery
+  try {
+    const recipient = await User.findById(userId).select("email name");
+    if (recipient && recipient.email) {
+      const subject = `Food Rescue: ${type.replace(/_/g, " ").toUpperCase()}`;
+      const html = `
+        <div style="font-family: Arial, sans-serif; max-width: 500px; margin: auto; padding: 20px; border: 1px solid #e5e7eb; border-radius: 8px;">
+          <h2 style="color: #16a34a; margin-top: 0;">Food Rescue Alert</h2>
+          <p>Hello <b>${recipient.name || "User"}</b>,</p>
+          <div style="background-color: #f0fdf4; border-left: 4px solid #16a34a; padding: 12px; margin: 16px 0; font-size: 15px;">
+            ${message}
+          </div>
+          <p style="color: #6b7280; font-size: 12px; margin-bottom: 0;">
+            This is an automated real-time notification from the Food Rescue system.
+          </p>
+        </div>
+      `;
+      await sendEmail({ to: recipient.email, subject, html, text: message });
+    }
+  } catch (err) {
+    console.error("[EMAIL-TRIGGER-ERROR]:", err.message);
+  }
 
   return notification;
 };
