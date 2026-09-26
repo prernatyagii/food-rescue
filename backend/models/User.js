@@ -51,6 +51,9 @@ const userSchema = new mongoose.Schema(
     isActive: { type: Boolean, default: true },
     resetOtp: { type: String, default: null },
     resetOtpExpiry: { type: Date, default: null },
+    emailOtp: { type: String, default: null },
+    emailOtpExpiry: { type: Date, default: null },
+    emailVerified: { type: Boolean, default: false },
   },
   { timestamps: true },
 );
@@ -58,3 +61,5 @@ const userSchema = new mongoose.Schema(
 userSchema.index({ location: "2dsphere" });
 
 module.exports = mongoose.model("User", userSchema);
+
+
