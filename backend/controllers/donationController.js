@@ -1,4 +1,4 @@
-const Donation = require("../models/Donation");
+﻿const Donation = require("../models/Donation");
 const User = require("../models/User");
 const generateOtp = require("../utils/generateOtp");
 const { notifyUser } = require("../utils/notify");
@@ -286,7 +286,7 @@ const acceptDonation = async (req, res) => {
     if (!donation) {
       return res.status(409).json({
         message:
-          "Too late — this donation was already claimed by another NGO",
+          "Too late â€” this donation was already claimed by another NGO",
       });
     }
 
@@ -294,7 +294,7 @@ const acceptDonation = async (req, res) => {
       userId: donation.host,
       donationId: donation._id,
       type: "donation_accepted",
-      message: `${req.user.name} accepted your donation. OTP ${donation.otp} — share it with the volunteer at pickup.`,
+      message: `${req.user.name} accepted your donation. OTP ${donation.otp} â€” share it with the volunteer at pickup.`,
     });
 
     res.json({
@@ -329,6 +329,9 @@ const assignVolunteer = async (req, res) => {
       });
     }
 
+    // Generate fresh 4-digit pickup OTP
+    const otp = generateOtp();
+
     const donation =
       await Donation.findOneAndUpdate(
         {
@@ -340,6 +343,7 @@ const assignVolunteer = async (req, res) => {
           status: "assigned",
           volunteer: volunteerId,
           assignedAt: new Date(),
+          otp: otp,
         },
         {
           new: true,
@@ -353,15 +357,17 @@ const assignVolunteer = async (req, res) => {
       });
     }
 
+    // Send pickup OTP to HOST registered email
     await notifyUser({
       userId: donation.host,
       donationId: donation._id,
       type: "volunteer_assigned",
-      message: `Volunteer ${volunteer.name} is on the way to pick up your donation.`,
+      message: `Volunteer ${volunteer.name} has been assigned to pick up your donation. Your pickup OTP is ${otp}. Please share this OTP with the volunteer at pickup.`,
     });
 
     res.json({
       donation,
+      message: "Volunteer assigned and pickup OTP sent to host email",
     });
   } catch (err) {
     console.error(
@@ -374,7 +380,6 @@ const assignVolunteer = async (req, res) => {
     });
   }
 };
-
 // ======================================================
 // PUT /api/donations/:id/location
 // Volunteer live location
@@ -484,7 +489,7 @@ const verifyPickup = async (req, res) => {
       donationId: donation._id,
       type: "pickup_verified",
       message:
-        "Pickup verified — your donation is on its way to the NGO.",
+        "Pickup verified â€” your donation is on its way to the NGO.",
     });
 
     res.json({
