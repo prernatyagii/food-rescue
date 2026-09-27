@@ -13,53 +13,101 @@ const NGODashboard = () => {
   const [toast, setToast] = useState("");
 
   const load = async () => {
-    const [n, m, v] = await Promise.all([
-      api.get("/donations/nearby"),
-      api.get("/donations/mine"),
-      api.get("/donations/volunteers/available"),
-    ]);
-    setNearby(n.data.donations);
-    setMine(m.data.donations);
-    setVolunteers(v.data.volunteers);
+    setError("");
+
+    // Load nearby donations independently
+    try {
+      const n = await api.get("/donations/nearby");
+      setNearby(n.data?.donations || []);
+    } catch (err) {
+      console.error("Nearby donations error:", err);
+      setNearby([]);
+      setError(
+        err.response?.data?.message ||
+          "Failed to load nearby donations"
+      );
+    }
+
+    // Load claimed donations independently
+    try {
+      const m = await api.get("/donations/mine");
+      setMine(m.data?.donations || []);
+    } catch (err) {
+      console.error("My donations error:", err);
+      setMine([]);
+    }
+
+    // Load volunteers independently
+    try {
+      const v = await api.get("/donations/volunteers/available");
+      setVolunteers(v.data?.volunteers || []);
+    } catch (err) {
+      console.error("Volunteers error:", err);
+      setVolunteers([]);
+    }
   };
 
   useEffect(() => {
     load();
+
     const socket = getSocket();
+
     socket.on("notification", (n) => {
       if (n.type === "new_donation_nearby") {
         setToast(n.message);
         load();
       }
     });
-    return () => socket.off("notification");
+
+    return () => {
+      socket.off("notification");
+    };
   }, []);
 
   const accept = async (id) => {
     setError("");
+
     try {
       await api.put(`/donations/${id}/accept`);
-      load();
+      await load();
     } catch (err) {
-      setError(err.response?.data?.message || "Failed to accept");
+      setError(
+        err.response?.data?.message ||
+          "Failed to accept donation"
+      );
     }
   };
 
   const assign = async (id) => {
     const volunteerId = selectedVolunteer[id];
-    if (!volunteerId) return setError("Select a volunteer first");
+
+    if (!volunteerId) {
+      setError("Select a volunteer first");
+      return;
+    }
+
     try {
-      await api.put(`/donations/${id}/assign-volunteer`, { volunteerId });
-      load();
+      await api.put(
+        `/donations/${id}/assign-volunteer`,
+        { volunteerId }
+      );
+
+      await load();
     } catch (err) {
-      setError(err.response?.data?.message || "Failed to assign volunteer");
+      setError(
+        err.response?.data?.message ||
+          "Failed to assign volunteer"
+      );
     }
   };
 
-  const acceptedNeedingVolunteer = mine.filter((d) => d.status === "accepted");
+  const acceptedNeedingVolunteer = mine.filter(
+    (d) => d.status === "accepted"
+  );
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
+
       <RoleBanner
         role="ngo"
         icon="🏢"
@@ -67,18 +115,39 @@ const NGODashboard = () => {
         caption="Connecting surplus to the people who need it most."
       />
 
-      {toast && <div className="bg-blue-50 text-blue-700 text-sm p-3 rounded-md mb-4">🔔 {toast}</div>}
-      {error && <div className="bg-red-50 text-red-700 text-sm p-3 rounded-md mb-4">{error}</div>}
+      {toast && (
+        <div className="bg-blue-50 text-blue-700 text-sm p-3 rounded-md mb-4">
+          🔔 {toast}
+        </div>
+      )}
 
+      {error && (
+        <div className="bg-red-50 text-red-700 text-sm p-3 rounded-md mb-4">
+          {error}
+        </div>
+      )}
+
+      {/* Nearby Donations */}
       <section className="mb-10">
-        <h2 className="text-lg font-semibold mb-4">Nearby pending donations ({nearby.length})</h2>
+        <h2 className="text-lg font-semibold mb-4">
+          Nearby pending donations ({nearby.length})
+        </h2>
+
         {nearby.length === 0 ? (
-          <p className="text-gray-500 text-sm">No pending donations nearby right now.</p>
+          <p className="text-gray-500 text-sm">
+            No pending donations nearby right now.
+          </p>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {nearby.map((d) => (
-              <DonationCard key={d._id} donation={d}>
-                <button onClick={() => accept(d._id)} className="btn-primary !px-3 !py-1.5 text-sm">
+              <DonationCard
+                key={d._id}
+                donation={d}
+              >
+                <button
+                  onClick={() => accept(d._id)}
+                  className="btn-primary !px-3 !py-1.5 text-sm"
+                >
                   Accept
                 </button>
               </DonationCard>
@@ -87,27 +156,57 @@ const NGODashboard = () => {
         )}
       </section>
 
+      {/* Assign Volunteer */}
       {acceptedNeedingVolunteer.length > 0 && (
         <section className="mb-10">
-          <h2 className="text-lg font-semibold mb-4">Assign a volunteer</h2>
+          <h2 className="text-lg font-semibold mb-4">
+            Assign a volunteer
+          </h2>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {acceptedNeedingVolunteer.map((d) => (
-              <div key={d._id} className="card-premium p-4 flex items-center gap-3">
+              <div
+                key={d._id}
+                className="card-premium p-4 flex items-center gap-3"
+              >
                 <div className="flex-1">
-                  <p className="font-medium">{d.foodType} · {d.quantity}</p>
-                  <p className="text-xs text-gray-400">Host: {d.host?.name}</p>
+                  <p className="font-medium">
+                    {d.foodType} · {d.quantity}
+                  </p>
+
+                  <p className="text-xs text-gray-400">
+                    Host: {d.host?.name}
+                  </p>
                 </div>
+
                 <select
                   className="border border-gray-300 rounded-md px-2 py-1.5 text-sm"
                   value={selectedVolunteer[d._id] || ""}
-                  onChange={(e) => setSelectedVolunteer({ ...selectedVolunteer, [d._id]: e.target.value })}
+                  onChange={(e) =>
+                    setSelectedVolunteer({
+                      ...selectedVolunteer,
+                      [d._id]: e.target.value,
+                    })
+                  }
                 >
-                  <option value="">Select volunteer</option>
+                  <option value="">
+                    Select volunteer
+                  </option>
+
                   {volunteers.map((v) => (
-                    <option key={v._id} value={v._id}>{v.name}</option>
+                    <option
+                      key={v._id}
+                      value={v._id}
+                    >
+                      {v.name}
+                    </option>
                   ))}
                 </select>
-                <button onClick={() => assign(d._id)} className="btn-primary !px-3 !py-1.5 text-sm">
+
+                <button
+                  onClick={() => assign(d._id)}
+                  className="btn-primary !px-3 !py-1.5 text-sm"
+                >
                   Assign
                 </button>
               </div>
@@ -116,14 +215,22 @@ const NGODashboard = () => {
         </section>
       )}
 
+      {/* My Claimed Donations */}
       <section>
-        <h2 className="text-lg font-semibold mb-4">Your claimed donations ({mine.length})</h2>
+        <h2 className="text-lg font-semibold mb-4">
+          Your claimed donations ({mine.length})
+        </h2>
+
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {mine.map((d) => (
-            <DonationCard key={d._id} donation={d} />
+            <DonationCard
+              key={d._id}
+              donation={d}
+            />
           ))}
         </div>
       </section>
+
     </div>
   );
 };

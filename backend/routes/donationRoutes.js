@@ -5,7 +5,7 @@ const upload = require("../middleware/upload");
 const ctrl = require("../controllers/donationController");
 
 router.post("/", protect, authorize("host"), upload.single("photo"), ctrl.createDonation);
-router.get("/nearby", protect, authorize("ngo"), requireVerified, ctrl.getNearbyDonations);
+router.get("/nearby", protect, authorize("ngo"), ctrl.getNearbyDonations);
 router.get("/mine", protect, ctrl.getMyDonations);
 router.get("/volunteers/available", protect, authorize("ngo"), requireVerified, ctrl.getAvailableVolunteers);
 router.get("/:id", protect, ctrl.getDonationById);
