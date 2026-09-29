@@ -2,14 +2,10 @@ const mongoose = require("mongoose");
 
 const donationSchema = new mongoose.Schema(
   {
-    host: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },  
+    host: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
 
-   category: { type: String, required: true },
-foodType: { type: String, required: true },
-foodCategory: { type: String, enum: ["Veg", "Non-Veg"], required: true },
-quantity: { type: String, required: true },
-
-    
+    foodType: { type: String, required: true },
+    quantity: { type: String, required: true }, // e.g. "15 kg" / "40 plates"
     description: { type: String, default: "" },
     photoUrl: { type: String, default: "" },
 

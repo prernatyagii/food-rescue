@@ -2,8 +2,17 @@ const mongoose = require("mongoose");
 
 const notificationSchema = new mongoose.Schema(
   {
-    user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
-    donation: { type: mongoose.Schema.Types.ObjectId, ref: "Donation" },
+    user: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+
+    donation: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Donation",
+    },
+
     type: {
       type: String,
       enum: [
@@ -12,13 +21,27 @@ const notificationSchema = new mongoose.Schema(
         "volunteer_assigned",
         "pickup_verified",
         "delivered",
+        "food_reached_ngo",
       ],
       required: true,
     },
-    message: { type: String, required: true },
-    read: { type: Boolean, default: false },
+
+    message: {
+      type: String,
+      required: true,
+    },
+
+    read: {
+      type: Boolean,
+      default: false,
+    },
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+  }
 );
 
-module.exports = mongoose.model("Notification", notificationSchema);
+module.exports = mongoose.model(
+  "Notification",
+  notificationSchema
+);

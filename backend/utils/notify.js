@@ -24,6 +24,9 @@ const notifyUser = async ({ userId, donationId, type, message }) => {
   // 3. Real-time Email & OTP delivery
   try {
     const recipient = await User.findById(userId).select("email name");
+console.log(
+  `[NOTIFY] user=${userId} name=${recipient?.name} email=${recipient?.email}`
+);
     if (recipient && recipient.email) {
       const subject = `Food Rescue: ${type.replace(/_/g, " ").toUpperCase()}`;
       const html = `

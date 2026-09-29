@@ -1,4 +1,4 @@
-﻿const Donation = require("../models/Donation");
+const Donation = require("../models/Donation");
 const User = require("../models/User");
 const generateOtp = require("../utils/generateOtp");
 const { notifyUser } = require("../utils/notify");
@@ -59,8 +59,7 @@ const createDonation = async (req, res) => {
         (Number(hoursValid) || 4) * 60 * 60 * 1000
     );
 
-    // Save donation location as GeoJSON
-    // IMPORTANT: GeoJSON order = [longitude, latitude]
+    // GeoJSON order = [longitude, latitude]
     const donation = await Donation.create({
       host: req.user._id,
       category,
@@ -69,7 +68,8 @@ const createDonation = async (req, res) => {
       quantity,
       description,
       photoUrl,
-      estimatedWeightKg: Number(estimatedWeightKg) || 5,
+      estimatedWeightKg:
+        Number(estimatedWeightKg) || 5,
 
       location: {
         type: "Point",
@@ -85,14 +85,14 @@ const createDonation = async (req, res) => {
     console.log("Food:", foodType);
     console.log("Food Type:", foodCategory);
     console.log("Quantity:", quantity);
-    console.log("Donation location:", [
-      longitude,
-      latitude,
-    ]);
+    console.log(
+      "Donation location:",
+      [longitude, latitude]
+    );
     console.log("Expires:", expiresAt);
     console.log("===================================");
 
-    // Find VERIFIED NGOs within 25 KM
+    // Find NGOs within configured radius
     const nearbyNGOs = await User.find({
       role: "ngo",
 
@@ -140,7 +140,10 @@ const createDonation = async (req, res) => {
       notifiedNgoCount: nearbyNGOs.length,
     });
   } catch (err) {
-    console.error("Create donation error:", err);
+    console.error(
+      "Create donation error:",
+      err
+    );
 
     res.status(500).json({
       message: err.message,
@@ -150,18 +153,17 @@ const createDonation = async (req, res) => {
 
 // ======================================================
 // GET /api/donations/nearby
-// NGO gets pending donations within 25 KM
+// NGO gets pending donations within radius
 // ======================================================
 const getNearbyDonations = async (req, res) => {
   try {
     const ngo = req.user;
 
-    // ---------------------------------------------
-    // Check NGO location exists
-    // ---------------------------------------------
     if (
       !ngo.location ||
-      !Array.isArray(ngo.location.coordinates) ||
+      !Array.isArray(
+        ngo.location.coordinates
+      ) ||
       ngo.location.coordinates.length !== 2
     ) {
       return res.status(400).json({
@@ -170,15 +172,14 @@ const getNearbyDonations = async (req, res) => {
       });
     }
 
-    const [lng, lat] = ngo.location.coordinates;
+    const [lng, lat] =
+      ngo.location.coordinates;
 
-    // ---------------------------------------------
-    // Validate NGO coordinates
-    // ---------------------------------------------
     if (
       !Number.isFinite(Number(lng)) ||
       !Number.isFinite(Number(lat)) ||
-      (Number(lng) === 0 && Number(lat) === 0)
+      (Number(lng) === 0 &&
+        Number(lat) === 0)
     ) {
       return res.status(400).json({
         message:
@@ -189,21 +190,23 @@ const getNearbyDonations = async (req, res) => {
     const ngoLongitude = Number(lng);
     const ngoLatitude = Number(lat);
 
-    console.log("========== NEARBY SEARCH ==========");
+    console.log(
+      "========== NEARBY SEARCH =========="
+    );
     console.log("NGO:", ngo.name);
     console.log(
       "NGO coordinates:",
       [ngoLongitude, ngoLatitude]
     );
-    console.log("Radius:", RADIUS_KM, "KM");
+    console.log(
+      "Radius:",
+      RADIUS_KM,
+      "KM"
+    );
 
-    // ---------------------------------------------
-    // Find pending donations within 25 KM
-    // ---------------------------------------------
     const donations = await Donation.find({
       status: "pending",
 
-      // Donation must not be expired
       expiresAt: {
         $gt: new Date(),
       },
@@ -217,20 +220,24 @@ const getNearbyDonations = async (req, res) => {
               ngoLatitude,
             ],
           },
-
-          $maxDistance: RADIUS_KM * 1000,
+          $maxDistance:
+            RADIUS_KM * 1000,
         },
       },
-    }).populate("host", "name phone");
+    }).populate(
+      "host",
+      "name phone"
+    );
 
     console.log(
       "Nearby donations found:",
       donations.length
     );
 
-    // Print every matched donation location
     donations.forEach((donation) => {
-      console.log("-----------------------------------");
+      console.log(
+        "-----------------------------------"
+      );
       console.log(
         "Donation ID:",
         donation._id
@@ -253,7 +260,9 @@ const getNearbyDonations = async (req, res) => {
       );
     });
 
-    console.log("===================================");
+    console.log(
+      "==================================="
+    );
 
     res.json({
       donations,
@@ -286,7 +295,7 @@ const acceptDonation = async (req, res) => {
           status: "accepted",
           ngo: req.user._id,
           acceptedAt: new Date(),
-        
+          otp: generateOtp(),
         },
         {
           new: true,
@@ -300,12 +309,21 @@ const acceptDonation = async (req, res) => {
       });
     }
 
-  
+    await notifyUser({
+      userId: donation.host,
+      donationId: donation._id,
+      type: "donation_accepted",
+      message: `${req.user.name} accepted your donation. The donation is now being prepared for volunteer pickup.`,
+    });
+
     res.json({
       donation,
     });
   } catch (err) {
-    console.error("Accept donation error:", err);
+    console.error(
+      "Accept donation error:",
+      err
+    );
 
     res.status(500).json({
       message: err.message,
@@ -319,17 +337,20 @@ const acceptDonation = async (req, res) => {
 // ======================================================
 const assignVolunteer = async (req, res) => {
   try {
-    const { volunteerId } = req.body;
+    const { volunteerId } =
+      req.body;
 
-    const volunteer = await User.findOne({
-      _id: volunteerId,
-      role: "volunteer",
-      isVerified: true,
-    });
+    const volunteer =
+      await User.findOne({
+        _id: volunteerId,
+        role: "volunteer",
+        isVerified: true,
+      });
 
     if (!volunteer) {
       return res.status(404).json({
-        message: "Verified volunteer not found",
+        message:
+          "Verified volunteer not found",
       });
     }
 
@@ -361,26 +382,58 @@ const assignVolunteer = async (req, res) => {
       });
     }
 
-   const host = await User.findById(donation.host).select("name");
+    // Get host and NGO details
+    const host = await User.findById(
+      donation.host
+    ).select("name email location");
 
-await notifyUser({
-  userId: donation.host,
-  donationId: donation._id,
-  type: "volunteer_assigned",
-  message: `NGO ${req.user.name} has accepted your food donation. Volunteer ${volunteer.name} will come to pick it up. Your pickup OTP is ${otp}. Please share this OTP with the volunteer at pickup.`,
-});
+    const ngo = await User.findById(
+      req.user._id
+    ).select(
+      "name email location ngoDetails"
+    );
 
-await notifyUser({
-  userId: volunteer._id,
-  donationId: donation._id,
-  type: "volunteer_assigned",
-  message: `NGO ${req.user.name} has assigned you to collect a food donation from host ${host?.name || "the host"}. Please pick up the food from the host and deliver it to NGO ${req.user.name}. The pickup OTP will be provided by the host at pickup.`,
-});
-   
-   
+    // ==================================================
+    // IMPORTANT:
+    // At assignment time OTP is NOT sent to host.
+    // First volunteer gets assignment email.
+    // After volunteer confirms assignment,
+    // host receives OTP.
+    // ==================================================
+
+    await notifyUser({
+      userId: volunteer._id,
+      donationId: donation._id,
+      type: "volunteer_assigned",
+      message: `
+NGO ${ngo?.name || req.user.name} has assigned you to collect and deliver a food donation.
+
+Pickup From:
+${host?.name || "Host"}
+
+Pickup Address:
+${donation.location?.address || "Host pickup location"}
+
+Food:
+${donation.foodType || "Food"}
+
+Quantity:
+${donation.quantity || "Not specified"}
+
+Deliver To:
+${ngo?.name || req.user.name}
+
+NGO Address:
+${ngo?.location?.address || "NGO delivery location"}
+
+Please confirm this assignment from your Volunteer Dashboard.
+      `.trim(),
+    });
+
     res.json({
       donation,
-      message: "Volunteer assigned successfully. Pickup OTP sent to host and task details sent to volunteer.",
+      message:
+        "Volunteer assigned successfully. Assignment email sent to volunteer.",
     });
   } catch (err) {
     console.error(
@@ -394,120 +447,163 @@ await notifyUser({
   }
 };
 
-
 // ======================================================
 // PUT /api/donations/:id/confirm-assignment
-// Volunteer confirms assigned donation
+// Volunteer confirms assignment
+// Host receives pickup OTP
 // ======================================================
-const confirmAssignment = async (req, res) => {
-  try {
-    const donation = await Donation.findOne({
-      _id: req.params.id,
-      volunteer: req.user._id,
-      status: "assigned",
-    });
-
-    if (!donation) {
-      return res.status(404).json({
-        message: "Donation not found or not assigned to you",
-      });
-    }
-
-    const host = await User.findById(donation.host).select("name email");
-
-    if (!host) {
-      return res.status(404).json({
-        message: "Host not found",
-      });
-    }
-
-    await notifyUser({
-      userId: host._id,
-      donationId: donation._id,
-      type: "volunteer_assigned",
-      message: `Volunteer ${req.user.name} has confirmed the assignment for your food donation. Your pickup OTP is ${donation.otp}. Please share this OTP with the volunteer when they arrive to collect the food.`,
-    });
-
-    res.json({
-      message: "Assignment confirmed. Pickup OTP has been sent to the host.",
-      donation,
-    });
-  } catch (err) {
-    console.error("Confirm assignment error:", err);
-
-    res.status(500).json({
-      message: err.message,
-    });
-  }
-};
-// ======================================================
-// PUT /api/donations/:id/location
-// Volunteer live location
-// ======================================================
-const updateVolunteerLocation = async (
+const confirmAssignment = async (
   req,
   res
 ) => {
   try {
-    const { lat, lng } = req.body;
-
     const donation =
-      await Donation.findOneAndUpdate(
-        {
-          _id: req.params.id,
-          volunteer: req.user._id,
-        },
-        {
-          volunteerLocation: {
-            coordinates: [
-              Number(lng),
-              Number(lat),
-            ],
-            updatedAt: new Date(),
-          },
-        },
-        {
-          new: true,
-        }
-      );
+      await Donation.findOne({
+        _id: req.params.id,
+        volunteer: req.user._id,
+        status: "assigned",
+      });
 
     if (!donation) {
       return res.status(404).json({
-        message: "Donation not found",
+        message:
+          "Donation not found or not assigned to you",
       });
     }
 
-    const io = req.app.get("io");
+    const host = await User.findById(
+      donation.host
+    ).select("name email");
 
-    if (io) {
-      io.to(`donation:${donation._id}`).emit(
-        "volunteer_location",
-        donation.volunteerLocation
-      );
+    if (!host) {
+      return res.status(404).json({
+        message:
+          "Host not found",
+      });
     }
 
+    // Send OTP to HOST only after
+    // volunteer confirms assignment.
+    await notifyUser({
+      userId: host._id,
+      donationId: donation._id,
+      type: "volunteer_assigned",
+      message: `
+Volunteer ${req.user.name} has confirmed the assignment for your food donation.
+
+Your pickup OTP is: ${donation.otp}
+
+Please share this OTP with the volunteer when the volunteer arrives to collect the food.
+      `.trim(),
+    });
+
     res.json({
-      ok: true,
+      message:
+        "Assignment confirmed. Pickup OTP has been sent to the host.",
+      donation,
     });
   } catch (err) {
     console.error(
-      "Volunteer location error:",
+      "Confirm assignment error:",
       err
     );
 
     res.status(500).json({
-      message: err.message,
+      message:
+        err.message ||
+        "Failed to confirm assignment",
     });
   }
 };
+
+// ======================================================
+// PUT /api/donations/:id/location
+// Volunteer live location
+// ======================================================
+const updateVolunteerLocation =
+  async (req, res) => {
+    try {
+      const { lat, lng } =
+        req.body;
+
+      const latitude = Number(lat);
+      const longitude = Number(lng);
+
+      if (
+        !Number.isFinite(latitude) ||
+        !Number.isFinite(longitude)
+      ) {
+        return res.status(400).json({
+          message:
+            "Invalid volunteer location",
+        });
+      }
+
+      const donation =
+        await Donation.findOneAndUpdate(
+          {
+            _id: req.params.id,
+            volunteer: req.user._id,
+          },
+          {
+            volunteerLocation: {
+              coordinates: [
+                longitude,
+                latitude,
+              ],
+              updatedAt: new Date(),
+            },
+          },
+          {
+            new: true,
+          }
+        );
+
+      if (!donation) {
+        return res.status(404).json({
+          message:
+            "Donation not found",
+        });
+      }
+
+      const io =
+        req.app.get("io");
+
+      if (io) {
+        io.to(
+          `donation:${donation._id}`
+        ).emit(
+          "volunteer_location",
+          donation.volunteerLocation
+        );
+      }
+
+      res.json({
+        ok: true,
+      });
+    } catch (err) {
+      console.error(
+        "Volunteer location error:",
+        err
+      );
+
+      res.status(500).json({
+        message: err.message,
+      });
+    }
+  };
 
 // ======================================================
 // PUT /api/donations/:id/verify-pickup
 // Volunteer verifies pickup using OTP
 // ======================================================
-const verifyPickup = async (req, res) => {
+const verifyPickup = async (
+  req,
+  res
+) => {
   try {
-    const { otp } = req.body;
+    const { otp } =
+      req.body;
 
     const donation =
       await Donation.findOne({
@@ -517,25 +613,35 @@ const verifyPickup = async (req, res) => {
 
     if (!donation) {
       return res.status(404).json({
-        message: "Donation not found",
+        message:
+          "Donation not found",
       });
     }
 
-    if (donation.status !== "assigned") {
+    if (
+      donation.status !==
+      "assigned"
+    ) {
       return res.status(400).json({
         message:
           "Donation is not awaiting pickup",
       });
     }
 
-    if (String(donation.otp) !== String(otp)) {
+    if (
+      donation.otp !== otp
+    ) {
       return res.status(400).json({
-        message: "Incorrect OTP",
+        message:
+          "Incorrect OTP",
       });
     }
 
-    donation.status = "picked_up";
-    donation.pickedUpAt = new Date();
+    donation.status =
+      "picked_up";
+
+    donation.pickedUpAt =
+      new Date();
 
     if (req.file) {
       donation.pickupPhotoUrl =
@@ -544,7 +650,15 @@ const verifyPickup = async (req, res) => {
 
     await donation.save();
 
-    
+    // Notify host that pickup
+    // has been verified.
+    await notifyUser({
+      userId: donation.host,
+      donationId: donation._id,
+      type: "pickup_verified",
+      message:
+        "Pickup verified — the volunteer has collected your food donation and it is on its way to the NGO.",
+    });
 
     res.json({
       donation,
@@ -565,7 +679,10 @@ const verifyPickup = async (req, res) => {
 // PUT /api/donations/:id/deliver
 // Volunteer marks donation delivered
 // ======================================================
-const markDelivered = async (req, res) => {
+const markDelivered = async (
+  req,
+  res
+) => {
   try {
     const donation =
       await Donation.findOneAndUpdate(
@@ -590,15 +707,17 @@ const markDelivered = async (req, res) => {
       });
     }
 
+    // IMPORTANT:
+    // Delivery notification goes to HOST.
     await notifyUser({
-  userId: donation.host,
-  donationId: donation._id,
-  type: "delivered",
-  message: "Your food donation has been successfully delivered to the NGO. Thank you for helping us reduce food waste!",
-});
+      userId: donation.host,
+      donationId: donation._id,
+      type: "delivered",
+      message:
+        "Your food donation has successfully reached the NGO. Thank you for helping us reduce food waste!",
+    });
 
     res.json({
-
       donation,
     });
   } catch (err) {
@@ -617,20 +736,27 @@ const markDelivered = async (req, res) => {
 // GET /api/donations/mine
 // Role-aware donation history
 // ======================================================
-const getMyDonations = async (req, res) => {
+const getMyDonations = async (
+  req,
+  res
+) => {
   try {
     const filter = {
       [req.user.role === "host"
         ? "host"
-        : req.user.role]: req.user._id,
+        : req.user.role]:
+        req.user._id,
     };
 
     const donations =
       await Donation.find(filter)
-        .populate("host", "name phone")
+        .populate(
+          "host",
+          "name phone location"
+        )
         .populate(
           "ngo",
-          "name ngoDetails.orgName"
+          "name ngoDetails.orgName location"
         )
         .populate(
           "volunteer",
@@ -657,7 +783,10 @@ const getMyDonations = async (req, res) => {
 // GET /api/donations/:id
 // Single donation detail
 // ======================================================
-const getDonationById = async (req, res) => {
+const getDonationById = async (
+  req,
+  res
+) => {
   try {
     const donation =
       await Donation.findById(
@@ -665,11 +794,11 @@ const getDonationById = async (req, res) => {
       )
         .populate(
           "host",
-          "name phone"
+          "name phone location"
         )
         .populate(
           "ngo",
-          "name ngoDetails.orgName"
+          "name ngoDetails.orgName location"
         )
         .populate(
           "volunteer",
@@ -678,7 +807,8 @@ const getDonationById = async (req, res) => {
 
     if (!donation) {
       return res.status(404).json({
-        message: "Donation not found",
+        message:
+          "Donation not found",
       });
     }
 
@@ -701,31 +831,31 @@ const getDonationById = async (req, res) => {
 // GET /api/donations/volunteers/available
 // NGO gets available verified volunteers
 // ======================================================
-const getAvailableVolunteers = async (
-  req,
-  res
-) => {
-  try {
-    const volunteers =
-      await User.find({
-        role: "volunteer",
-        isVerified: true,
-      }).select("name phone");
+const getAvailableVolunteers =
+  async (req, res) => {
+    try {
+      const volunteers =
+        await User.find({
+          role: "volunteer",
+          isVerified: true,
+        }).select(
+          "name phone email"
+        );
 
-    res.json({
-      volunteers,
-    });
-  } catch (err) {
-    console.error(
-      "Get volunteers error:",
-      err
-    );
+      res.json({
+        volunteers,
+      });
+    } catch (err) {
+      console.error(
+        "Get volunteers error:",
+        err
+      );
 
-    res.status(500).json({
-      message: err.message,
-    });
-  }
-};
+      res.status(500).json({
+        message: err.message,
+      });
+    }
+  };
 
 // ======================================================
 // EXPORTS
@@ -743,5 +873,3 @@ module.exports = {
   getDonationById,
   getAvailableVolunteers,
 };
-
-
